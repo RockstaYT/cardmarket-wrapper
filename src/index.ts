@@ -1,1 +1,118 @@
-export const Greeter = (name: string) => `Hello ${name}`;
+import * as crypto from 'crypto';
+import fetch from 'node-fetch';
+
+export interface cardmarketParameters {
+  realm: string;
+  oauth_consumer_key: string;
+  oauth_nonce: string;
+  oauth_signature_method: string;
+  oauth_timestamp: number;
+  oauth_token: string;
+  oauth_version: string;
+}
+
+export interface cardmarketQuery {
+  queryName: string;
+  queryValue: string | number;
+}
+
+export interface method {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+}
+
+export class Greeter {
+  private APP_TOKEN = '';
+  private APP_SECRET = '';
+  private ACCESS_TOKEN = '';
+  private ACCESS_TOKEN_SECRET = '';
+  private CARDMARTKET_URL = 'https://api.cardmarket.com/ws/v2.0';
+  private OAUTH_VERSION = '1.0';
+  private SIGNATURE_METHOD = 'HMAC-SHA1';
+  private _debug = false;
+
+  constructor(appToken: string, accessToken: string, appSecret?: string, access_token_secret?: string) {
+    if (!appToken) throw new Error('App Token cannot be empty');
+    this.APP_TOKEN = appToken;
+    if (!accessToken) throw new Error('Access Token cannot be empty');
+    this.ACCESS_TOKEN = accessToken;
+    this.APP_SECRET = appSecret || '';
+    this.ACCESS_TOKEN_SECRET = access_token_secret || '';
+  }
+
+  /**
+   * Set the debug Flag
+   * @param flag
+   */
+  async setDebug(flag: boolean): Promise<void> {
+    this._debug = flag;
+  }
+
+  async getAccountInfo() {
+    //const path: string = `${this.CARDMARTKET_URL}/account`;
+    const path: string = `${this.CARDMARTKET_URL}/expansions/1469/singles`;
+    this.debugLog(`Requesting Account Info.\nPath is: ${path}`);
+    const method: method = { method: 'GET' };
+    const nonce: string = '53eb1f44909d6';
+    const encodedPath = encodeURIComponent(path);
+    let basePath: string = `${method}&${encodedPath}&`;
+    const baseParams: cardmarketQuery[] = [
+      { queryName: 'oauth_consumer_key', queryValue: this.APP_TOKEN },
+      { queryName: 'oauth_nonce', queryValue: nonce },
+      { queryName: 'oauth_signature_method', queryValue: 'HMAC-SHA1' },
+      { queryName: 'oauth_timestamp', queryValue: Date.now() },
+      { queryName: 'oauth_version', queryValue: this.APP_TOKEN },
+      { queryName: 'oauth_token', queryValue: this.ACCESS_TOKEN },
+    ];
+    const paramString: string = await this.generateParams(baseParams);
+    basePath += encodeURIComponent(paramString);
+    const signingKey = `${encodeURIComponent(this.APP_SECRET)}&${encodeURIComponent(this.ACCESS_TOKEN_SECRET)}`;
+    let hmac = crypto.createHmac('sha1', signingKey);
+    let hash = hmac.update(basePath);
+    let digest = hmac.digest('base64');
+    this.debugLog(digest);
+    const authProperty = `OAuth realm="${path}", oauth_version="${
+      this.OAUTH_VERSION
+    }", oauth_timestamp="${Date.now()}", oauth_nonce="${nonce}", oauth_consumer_key="${this.APP_TOKEN}", oauth_token="${
+      this.ACCESS_TOKEN
+    }", oauth_signature_method="${this.SIGNATURE_METHOD}", oauth_signature="${digest}"`;
+    const res = await fetch(path, {
+      method: method.method,
+      headers: {
+        'Content-Type': 'application/xml',
+        Authorization: authProperty,
+        Accept: 'application/json',
+      },
+      redirect: 'follow',
+    });
+    this.debugLog(authProperty);
+    this.debugLog(res);
+  }
+
+  /*************************************Helper Functions*********************************************/
+
+  /**
+   * Log debug messages when the debug flag is set
+   * @param msg The message to print
+   */
+  private async debugLog(msg: any): Promise<void> {
+    if (this._debug) console.log(msg);
+  }
+
+  /**
+   * Generate the parameter string
+   * @param params The parameter array
+   * @returns The parameter string
+   */
+  private async generateParams(params: cardmarketQuery[]): Promise<string> {
+    params.sort((a, b) => {
+      let keyA = a.queryName;
+      let keyB = b.queryName;
+      return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
+    });
+    let paramString = '';
+    params.forEach((param) => {
+      paramString += `${param.queryName}=${encodeURIComponent(param.queryValue)}&`;
+    });
+    return paramString.slice(0, -1);
+  }
+}
