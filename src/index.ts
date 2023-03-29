@@ -1,7 +1,7 @@
 import * as crypto from 'crypto';
 import fetch from 'node-fetch';
 
-export interface cardmarketParameters {
+export interface CardmarketParameters {
   realm: string;
   oauth_consumer_key: string;
   oauth_nonce: string;
@@ -11,16 +11,16 @@ export interface cardmarketParameters {
   oauth_version: string;
 }
 
-export interface cardmarketQuery {
+export interface CardmarketQuery {
   queryName: string;
   queryValue: string | number;
 }
 
-export interface method {
+export interface RestMethod {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
 }
 
-export class Greeter {
+export class CardmarketWrapper {
   private APP_TOKEN = '';
   private APP_SECRET = '';
   private ACCESS_TOKEN = '';
@@ -30,13 +30,13 @@ export class Greeter {
   private SIGNATURE_METHOD = 'HMAC-SHA1';
   private _debug = false;
 
-  constructor(appToken: string, accessToken: string, appSecret?: string, access_token_secret?: string) {
+  constructor(appToken: string, accessToken: string, appSecret?: string, accessTokenSecret?: string) {
     if (!appToken) throw new Error('App Token cannot be empty');
     this.APP_TOKEN = appToken;
     if (!accessToken) throw new Error('Access Token cannot be empty');
     this.ACCESS_TOKEN = accessToken;
     this.APP_SECRET = appSecret || '';
-    this.ACCESS_TOKEN_SECRET = access_token_secret || '';
+    this.ACCESS_TOKEN_SECRET = accessTokenSecret || '';
   }
 
   /**
@@ -48,14 +48,13 @@ export class Greeter {
   }
 
   async getAccountInfo() {
-    //const path: string = `${this.CARDMARTKET_URL}/account`;
     const path: string = `${this.CARDMARTKET_URL}/expansions/1469/singles`;
     this.debugLog(`Requesting Account Info.\nPath is: ${path}`);
-    const method: method = { method: 'GET' };
+    const method: RestMethod = { method: 'GET' };
     const nonce: string = '53eb1f44909d6';
     const encodedPath = encodeURIComponent(path);
     let basePath: string = `${method}&${encodedPath}&`;
-    const baseParams: cardmarketQuery[] = [
+    const baseParams: CardmarketQuery[] = [
       { queryName: 'oauth_consumer_key', queryValue: this.APP_TOKEN },
       { queryName: 'oauth_nonce', queryValue: nonce },
       { queryName: 'oauth_signature_method', queryValue: 'HMAC-SHA1' },
@@ -66,9 +65,9 @@ export class Greeter {
     const paramString: string = await this.generateParams(baseParams);
     basePath += encodeURIComponent(paramString);
     const signingKey = `${encodeURIComponent(this.APP_SECRET)}&${encodeURIComponent(this.ACCESS_TOKEN_SECRET)}`;
-    let hmac = crypto.createHmac('sha1', signingKey);
-    let hash = hmac.update(basePath);
-    let digest = hmac.digest('base64');
+    const hmac = crypto.createHmac('sha1', signingKey);
+    hmac.update(basePath);
+    const digest = hmac.digest('base64');
     this.debugLog(digest);
     const authProperty = `OAuth realm="${path}", oauth_version="${
       this.OAUTH_VERSION
@@ -103,10 +102,10 @@ export class Greeter {
    * @param params The parameter array
    * @returns The parameter string
    */
-  private async generateParams(params: cardmarketQuery[]): Promise<string> {
+  private async generateParams(params: CardmarketQuery[]): Promise<string> {
     params.sort((a, b) => {
-      let keyA = a.queryName;
-      let keyB = b.queryName;
+      const keyA = a.queryName;
+      const keyB = b.queryName;
       return keyA < keyB ? -1 : keyA > keyB ? 1 : 0;
     });
     let paramString = '';
