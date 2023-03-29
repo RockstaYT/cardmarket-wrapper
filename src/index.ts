@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import fetch from 'node-fetch';
+import * as fetch from 'node-fetch';
 
 export interface CardmarketParameters {
   realm: string;
